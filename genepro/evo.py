@@ -112,10 +112,22 @@ class Evolution:
     ):
 
     # set parameters as attributes
-    _, _, _, values = inspect.getargvalues(inspect.currentframe())
-    values.pop('self')
-    for arg, val in values.items():
-      setattr(self, arg, val)
+    # Use a more robust approach without inspect.getargvalues()
+    self.fitness_function = fitness_function
+    self.internal_nodes = internal_nodes
+    self.leaf_nodes = leaf_nodes
+    self.pop_size = pop_size
+    self.init_max_depth = init_max_depth
+    self.max_tree_size = max_tree_size
+    self.crossovers = crossovers
+    self.mutations = mutations
+    self.coeff_opts = coeff_opts
+    self.selection = selection
+    self.max_evals = max_evals
+    self.max_gens = max_gens
+    self.max_time = max_time
+    self.n_jobs = n_jobs
+    self.verbose = verbose
 
     # fill-in empty kwargs if absent in crossovers, mutations, coeff_opts
     for variation_list in [crossovers, mutations, coeff_opts]:
