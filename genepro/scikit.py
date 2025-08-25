@@ -85,8 +85,11 @@ class GeneProRegressor(GeneProEstimator):
     self.use_linear_scaling = use_linear_scaling
 
     # create a fitness function
-    def fitness_function(tree, X, y, use_linear_scaling, score):
-      pred = _get_or_create_runner(X).run(tree)
+    def fitness_function(tree, X, y, use_linear_scaling, score, use_opencl):
+      if use_opencl:
+        pred = _get_or_create_runner(X).run(tree)
+      else:
+        pred = tree(X)
       if use_linear_scaling:
         slope, intercept = compute_linear_scaling(y, pred)
         pred = intercept + slope*pred
@@ -96,7 +99,7 @@ class GeneProRegressor(GeneProEstimator):
   
   def fit(self, X, y):
     super(GeneProRegressor,self).fit(X,y)
-    self.evo.fitness_function = functools.partial(self.evo.fitness_function, X=self.X_, y=self.y_, use_linear_scaling=self.use_linear_scaling, score=self.score)
+    self.evo.fitness_function = functools.partial(self.evo.fitness_function, X=self.X_, y=self.y_, use_linear_scaling=self.use_linear_scaling, score=self.score, use_opencl=self.evo.use_opencl)
     self.evo.evolve()
 
 
@@ -129,8 +132,11 @@ class GeneProClassifier(GeneProEstimator):
       self.score = balanced_accuracy_score
 
     # create a fitness function
-    def fitness_function(tree, X, y, score):
-      out = _get_or_create_runner(X).run(tree)
+    def fitness_function(tree, X, y, score, use_opencl):
+      if use_opencl:
+        out = _get_or_create_runner(X).run(tree)
+      else:
+        out = tree(X)
       pred = np.where(out < 0, -1, 1)
       return score(y, pred)
 
@@ -147,7 +153,7 @@ class GeneProClassifier(GeneProEstimator):
     # convert y_ into -1 and +1
     self.y_ = np.where(self.y_ == self.classes_[0], -1, +1)
 
-    self.evo.fitness_function = functools.partial(self.evo.fitness_function, X=self.X_, y=self.y_, score=self.score)
+    self.evo.fitness_function = functools.partial(self.evo.fitness_function, X=self.X_, y=self.y_, score=self.score, use_opencl=self.evo.use_opencl)
     self.evo.evolve()
 
   def predict(self, X, best_ever=False):

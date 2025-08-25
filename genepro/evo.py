@@ -108,6 +108,7 @@ class Evolution:
     max_time : int=None,
     # other
     n_jobs : int=4,
+    use_opencl : bool=False,
     verbose : bool=False,
     ):
 
@@ -127,6 +128,7 @@ class Evolution:
     self.max_gens = max_gens
     self.max_time = max_time
     self.n_jobs = n_jobs
+    self.use_opencl = use_opencl
     self.verbose = verbose
 
     # fill-in empty kwargs if absent in crossovers, mutations, coeff_opts
