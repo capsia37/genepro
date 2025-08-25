@@ -6,6 +6,7 @@ from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 
 from genepro.evo import Evolution
+from genepro.cl_tree_runner import OpenCLTreeRunner
 from genepro.node_impl import *
 from genepro.util import compute_linear_scaling
 
@@ -35,6 +36,7 @@ class GeneProEstimator(BaseEstimator):
     X, y = check_X_y(X, y)
     
     self.X_ = X
+    self.cl_tree_runner = OpenCLTreeRunner(X)
     self.y_ = y
 
     # default generation of leaf nodes
@@ -71,7 +73,7 @@ class GeneProRegressor(GeneProEstimator):
 
     # create a fitness function
     def fitness_function(tree, X, y, use_linear_scaling, score):
-      pred = tree(X)
+      pred = self.cl_tree_runner.run(tree)
       if use_linear_scaling:
         slope, intercept = compute_linear_scaling(y, pred)
         pred = intercept + slope*pred
@@ -115,7 +117,7 @@ class GeneProClassifier(GeneProEstimator):
 
     # create a fitness function
     def fitness_function(tree, X, y, score):
-      out = tree(X)
+      out = self.cl_tree_runner.run(tree)
       pred = np.where(out < 0, -1, 1)
       return score(y, pred)
 

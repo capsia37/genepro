@@ -145,6 +145,17 @@ class Node:
     """
     raise NotImplementedError()
 
+  def to_opencl(self) -> str:
+    """
+    Converts this node to an OpenCL expression
+
+    Returns
+    -------
+    str
+      OpenCL expression representing this node
+    """
+    raise NotImplementedError()
+
   def get_depth(self) -> int:
     """
     Returns the depth of this node (the root node has depth 0)

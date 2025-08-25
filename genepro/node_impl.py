@@ -14,6 +14,9 @@ class Plus(Node):
   def get_output(self, X):
     c_outs = self._get_child_outputs(X)
     return c_outs[0] + c_outs[1]
+  
+  def to_opencl(self):
+    return f"({self._children[0].to_opencl()} + {self._children[1].to_opencl()})"
 
 
 class Minus(Node):
@@ -28,6 +31,9 @@ class Minus(Node):
   def get_output(self, X):
     c_outs = self._get_child_outputs(X)
     return c_outs[0] - c_outs[1]
+  
+  def to_opencl(self):
+    return f"({self._children[0].to_opencl()} - {self._children[1].to_opencl()})"
 
 
 class Times(Node):
@@ -42,6 +48,9 @@ class Times(Node):
   def get_output(self, X):
     c_outs = self._get_child_outputs(X)
     return np.multiply(c_outs[0], c_outs[1])
+  
+  def to_opencl(self):
+    return f"({self._children[0].to_opencl()} * {self._children[1].to_opencl()})"
 
 
 class Div(Node):
@@ -60,6 +69,9 @@ class Div(Node):
     sign_b = np.where(sign_b == 0, 1, sign_b) 
     protected_div = sign_b * c_outs[0] / (1e-9 + np.abs(c_outs[1]))
     return protected_div
+  
+  def to_opencl(self):
+    return f"({self._children[0].to_opencl()} / (1e-9 + fabs({self._children[1].to_opencl()})) * sign({self._children[1].to_opencl()}))"
 
 
 class Square(Node):
@@ -74,6 +86,9 @@ class Square(Node):
   def get_output(self, X):
     c_outs = self._get_child_outputs(X)
     return np.square(c_outs[0])
+  
+  def to_opencl(self):
+    return f"pow({self._children[0].to_opencl()}, 2.0f)"
 
 
 class Cube(Node):
@@ -88,6 +103,9 @@ class Cube(Node):
   def get_output(self, X):
     c_outs = self._get_child_outputs(X)
     return np.multiply(np.square(c_outs[0]), c_outs[0])
+  
+  def to_opencl(self):
+    return f"pow({self._children[0].to_opencl()}, 3.0f)"
 
 
 class Sqrt(Node):
@@ -104,6 +122,9 @@ class Sqrt(Node):
     c_outs = self._get_child_outputs(X)
     # implements a protection to avoid arg <= 0
     return np.sqrt(np.abs(c_outs[0]))
+  
+  def to_opencl(self):
+    return f"sqrt(fabs({self._children[0].to_opencl()}))"
 
 
 class Log(Node):
@@ -121,6 +142,9 @@ class Log(Node):
     # implements a protection to avoid arg <= 0
     protected_log = np.log(np.abs(c_outs[0]) + 1e-9)
     return protected_log
+  
+  def to_opencl(self):
+    return f"log(fabs({self._children[0].to_opencl()} + 1e-9))"
 
 
 class Exp(Node):
@@ -135,6 +159,9 @@ class Exp(Node):
   def get_output(self, X):
     c_outs = self._get_child_outputs(X)
     return np.exp(c_outs[0])
+  
+  def to_opencl(self):
+    return f"exp({self._children[0].to_opencl()})"
 
 
 class Sin(Node):
@@ -149,6 +176,9 @@ class Sin(Node):
   def get_output(self, X):
     c_outs = self._get_child_outputs(X)
     return np.sin(c_outs[0])
+  
+  def to_opencl(self):
+    return f"sin({self._children[0].to_opencl()})"
 
 
 class Cos(Node):
@@ -163,6 +193,9 @@ class Cos(Node):
   def get_output(self, X):
     c_outs = self._get_child_outputs(X)
     return np.cos(c_outs[0])
+  
+  def to_opencl(self):
+    return f"cos({self._children[0].to_opencl()})"
 
 
 class Max(Node):
@@ -177,6 +210,9 @@ class Max(Node):
   def get_output(self, X):
     c_outs = self._get_child_outputs(X)
     return np.where(c_outs[0]>c_outs[1], c_outs[0], c_outs[1])
+  
+  def to_opencl(self):
+    return f"fmax({self._children[0].to_opencl()}, {self._children[1].to_opencl()})"
 
 
 class Min(Node):
@@ -191,6 +227,9 @@ class Min(Node):
   def get_output(self, X):
     c_outs = self._get_child_outputs(X)
     return np.where(c_outs[0]<c_outs[1], c_outs[0], c_outs[1])
+  
+  def to_opencl(self):
+    return f"fmin({self._children[0].to_opencl()}, {self._children[1].to_opencl()})"
 
 
 class IfThenElse(Node):
@@ -205,6 +244,9 @@ class IfThenElse(Node):
   def get_output(self, X):
     c_outs = self._get_child_outputs(X)
     return np.where(c_outs[0]>=0, c_outs[1], c_outs[2])
+  
+  def to_opencl(self):
+    return f"({self._children[0].to_opencl()} >= 0 ? {self._children[1].to_opencl()} : {self._children[2].to_opencl()})"
 
 
 class Feature(Node):
@@ -219,6 +261,9 @@ class Feature(Node):
 
   def get_output(self, X):
     return X[:,self.id]
+  
+  def to_opencl(self):
+    return f"X[{self.id} + feature_count * idx]"  # OpenCL uses global size to index the input array
 
 class Constant(Node):
   def __init__(self, value : float=None):
@@ -247,3 +292,8 @@ class Constant(Node):
     # make sure it is initialized
     v = self.get_value()
     return np.repeat(v, len(X))
+  
+  def to_opencl(self):
+    # make sure it is initialized
+    v = self.get_value()
+    return str(v)  # OpenCL does not need to repeat the value, just use it directly
