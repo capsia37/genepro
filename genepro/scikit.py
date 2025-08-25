@@ -1,3 +1,4 @@
+import os
 import functools
 import numpy as np
 from sklearn.base import BaseEstimator
@@ -9,6 +10,19 @@ from genepro.evo import Evolution
 from genepro.cl_tree_runner import OpenCLTreeRunner
 from genepro.node_impl import *
 from genepro.util import compute_linear_scaling
+
+# Process-local cache for OpenCL runners so each worker creates its own context
+_opencl_runner_cache = {}
+
+def _get_or_create_runner(X: np.ndarray):
+  """Return a process-local OpenCLTreeRunner for X, creating it if needed."""
+  pid = os.getpid()
+  runner = _opencl_runner_cache.get(pid)
+  # If runner exists, ensure it matches the feature shape; if not, recreate
+  if runner is None or runner.feature_count != X.shape[1] or runner.sample_count != X.shape[0]:
+    runner = OpenCLTreeRunner(X)
+    _opencl_runner_cache[pid] = runner
+  return runner
 
 class GeneProEstimator(BaseEstimator):
   def __init__(self,
@@ -36,7 +50,6 @@ class GeneProEstimator(BaseEstimator):
     X, y = check_X_y(X, y)
     
     self.X_ = X
-    self.cl_tree_runner = OpenCLTreeRunner(X)
     self.y_ = y
 
     # default generation of leaf nodes
@@ -73,7 +86,7 @@ class GeneProRegressor(GeneProEstimator):
 
     # create a fitness function
     def fitness_function(tree, X, y, use_linear_scaling, score):
-      pred = self.cl_tree_runner.run(tree)
+      pred = _get_or_create_runner(X).run(tree)
       if use_linear_scaling:
         slope, intercept = compute_linear_scaling(y, pred)
         pred = intercept + slope*pred
@@ -117,7 +130,7 @@ class GeneProClassifier(GeneProEstimator):
 
     # create a fitness function
     def fitness_function(tree, X, y, score):
-      out = self.cl_tree_runner.run(tree)
+      out = _get_or_create_runner(X).run(tree)
       pred = np.where(out < 0, -1, 1)
       return score(y, pred)
 
