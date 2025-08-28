@@ -9,14 +9,8 @@ class OpenCLTreeRunner:
 
     Parameters
     ----------
-    tree : Node
-        The root node of the tree to be evaluated.
     X : np.ndarray
         Input data to evaluate the tree on.
-    cl_ctx : cl.Context
-        OpenCL context for the device.
-    cl_queue : cl.CommandQueue
-        Command queue for executing OpenCL commands.
     """
 
     def __init__(self, X: np.ndarray):
@@ -46,12 +40,6 @@ class OpenCLTreeRunner:
         ----------
         tree : Node
             The root node of the tree to be evaluated.
-        X : np.ndarray
-            Input data to evaluate the tree on.
-        cl_ctx : cl.Context
-            OpenCL context for the device.
-        cl_queue : cl.CommandQueue
-            Command queue for executing OpenCL commands.
 
         Returns
         -------
@@ -82,6 +70,11 @@ class OpenCLTreeRunner:
 
         # Read the output back to host
         output = np.empty(self.sample_count, dtype=np.float32)
+
+        # Wait for evaluation to terminate 
+        # (Note: this is implicit in enqueue_copy, explicit wait is only useful to separate copy time from execution time in the profiler)
+        self.cl_queue.finish()
+
         cl.enqueue_copy(self.cl_queue, output, output_buf)
 
         return output
