@@ -1,4 +1,5 @@
 import os
+import json
 import numpy as np
 import time
 import argparse
@@ -10,7 +11,7 @@ from genepro.scikit import GeneProClassifier
 from genepro.node_impl import *
 
 
-def run_regr(n_samples: int = 1_000_000, use_opencl: bool = True, n_jobs: int = 4, max_gens: int = 40):
+def run_regr(n_samples: int = 1_000_000, use_opencl: bool = True, n_jobs: int = 4, max_gens: int = 40, opencl_platform: str = "radeonsi"):
   """Run the regression/classification script.
 
   Args:
@@ -23,7 +24,7 @@ def run_regr(n_samples: int = 1_000_000, use_opencl: bool = True, n_jobs: int = 
   """
   #os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1' # Enable PyOpenCL compiler output
   if use_opencl:
-    os.environ['RUSTICL_ENABLE'] = 'nouveau'  # Enable RUSTICL for AMD GPUs
+    os.environ['RUSTICL_ENABLE'] = opencl_platform  # Enable RUSTICL for AMD GPUs
   else:
     # ensure the variable is not set
     os.environ.pop('RUSTICL_ENABLE', None)
@@ -31,13 +32,14 @@ def run_regr(n_samples: int = 1_000_000, use_opencl: bool = True, n_jobs: int = 
   # Let's load the Breast Cancer data set from sklearn
   X, y = load_breast_cancer(return_X_y=True)
 
-  # Bootstrap to requested number of samples
-  idx = np.random.choice(np.arange(X.shape[0]), size=n_samples, replace=True)
-  X = X[idx]
-  y = y[idx]
-
   # Create a train and test split
   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+  # Bootstrap the training set to requested number of training samples (with replacement)
+  if n_samples is not None and n_samples > 0:
+    train_idx = np.random.choice(np.arange(X_train.shape[0]), size=n_samples, replace=True)
+    X_train = X_train[train_idx]
+    y_train = y_train[train_idx]
 
   # Apply feature normalization
   scaler = StandardScaler()
@@ -90,6 +92,11 @@ if __name__ == "__main__":
   parser.add_argument("--sizes", "-s", type=str, default="100,1000,10000,100000,1000000",
                       help=("Comma-separated list of sample sizes to run. Example: --sizes=100,1000,10000 "
                             "(default: '100,1000,10000,100000,1000000')."))
+  parser.add_argument("--opencl-platform", "-p", type=str, default="radeonsi",
+                     help="OpenCL platform to use (default: 'radeonsi'), other options include 'iris', 'nouveau', etc.")
+  parser.add_argument("--meta-out", type=str, default=None,
+                     help="Optional path to write JSON metadata for the run (overwritten)."
+                     )
   # mutually exclusive options to restrict runs to only opencl or only cpu
   group = parser.add_mutually_exclusive_group()
   group.add_argument("--opencl-only", action="store_true",
@@ -125,13 +132,22 @@ if __name__ == "__main__":
         # record failure
         elapsed = time.perf_counter() - t0
         print(f"Run failed for n={n}, use_opencl={use_opencl}: {e}")
-        results.append({
+        entry = {
           'n_samples': n,
           'use_opencl': use_opencl,
           'elapsed_s': elapsed,
           'test_acc': None,
           'error': str(e),
-        })
+        }
+        results.append(entry)
+        # write metadata if requested
+        try:
+          if args.meta_out:
+            with open(args.meta_out, 'w', encoding='utf-8') as mfh:
+              json.dump(entry, mfh)
+        except Exception:
+          # don't let metadata writing break the run
+          pass
         continue
 
       elapsed = time.perf_counter() - t0
@@ -143,6 +159,21 @@ if __name__ == "__main__":
         'test_acc': float(test_acc),
         'error': None,
       })
+      # write metadata if requested
+      try:
+        if args.meta_out:
+          entry = {
+            'n_samples': n,
+            'use_opencl': use_opencl,
+            'elapsed_s': elapsed,
+            'test_acc': float(test_acc),
+            'error': None,
+          }
+          with open(args.meta_out, 'w', encoding='utf-8') as mfh:
+            json.dump(entry, mfh)
+      except Exception:
+        # don't let metadata writing break the run
+        pass
 
       # apply cooldown between runs if requested, but not after the very last run
       is_last_run = (use_opencl is False) and (i == len(sizes) - 1)
